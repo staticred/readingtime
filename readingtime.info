@@ -1,0 +1,10 @@
+; $Id:$
+name = Reading Time
+description = "This module calculates the reading time for a node, and displays it as a field."
+core = 7.x
+package = Content
+version = 7.x-1.0-dev
+
+
+files[] = readingtime.module
+

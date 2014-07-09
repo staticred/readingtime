@@ -1,0 +1,203 @@
+<?php
+/**
+ * @file
+ * A field that calculates reading time for a node's body field.
+ */
+
+/**
+ * Implements hook_field_info().
+ *
+ * Provides the description of the field.
+ */
+function readingtime_field_info() {
+  return array(
+    'field_readingtime' => array(
+      'label' => t('Display reading time'),
+      'description' => t("Time required to read a node's content"),
+      'default_widget' => 'readingtime_default',
+      'default_formatter' => 'readingtime_default',
+    ),
+  );
+}
+
+/**
+ * Implements hook_field_is_empty().
+ *
+ * hook_field_is_emtpy() is where Drupal asks us if this field is empty.
+ * Return TRUE if it does not contain data, FALSE if it does. This lets
+ * the form API flag an error when required fields are empty.
+ */
+function readingtime_field_is_empty($item, $field) {
+  return empty($item['readingtime']);
+}
+
+
+/**
+ * Implements hook_field_formatter_info().
+ *
+ * We need to tell Drupal that we have two different types of formatters
+ * for this field. One will change the text color, and the other will
+ * change the background color.
+ *
+ * @see field_example_field_formatter_view()
+ */
+function readingtime_field_formatter_info() {
+  return array(
+    // This formatter just displays the hex value in the color indicated.
+    'readingtime_default' => array(
+      'label' => t('Time to read'),
+      'field types' => array('field_readingtime'),
+    ),
+  );
+}
+
+/**
+ * Implements hook_field_formatter_view().
+ *
+ * A single formatter is implemented.
+ * - readingtime_default just outputs markup indicating the time required
+ *   to read the node's body field.
+ * @see field_example_field_formatter_info()
+ */
+function readingtime_field_formatter_view($entity_type, $entity, $field, $instance, $langcode, $items, $display) {
+  $element = array();
+
+  switch ($display['type']) {
+
+    case 'readingtime_default':
+
+      // Safety check, just in case the body field is gone.
+      if (isset($entity->body)) {
+        // Calculate reading time.
+        $content = render($entity->body[$langcode][0]['safe_value']);
+        $reading_estimate = _calculate_reading_time($content);
+        foreach ($items as $delta => $item) {
+          if ($item['readingtime']) {
+            $element[$delta] = array(
+              '#type' => 'html_tag',
+              '#tag' => 'div',
+              '#value' => $reading_estimate . ' ' . t('minutes to read.'),
+              '#attributes' => array(
+                'id' => 'readingtime_' . $delta,
+                'class' => 'readingtime',
+              ),
+            );
+          }
+        }
+      }
+      break;
+  }
+  return $element;
+}
+
+/**
+ * Implements hook_field_widget_info().
+ *
+ * Three widgets are provided.
+ * - A simple text-only widget where the user enters the '#ffffff'.
+ * - A 3-textfield widget that gathers the red, green, and blue values
+ *   separately.
+ * - A farbtastic colorpicker widget that chooses the value graphically.
+ *
+ * These widget types will eventually show up in hook_field_widget_form,
+ * where we will have to flesh them out.
+ *
+ * @see field_example_field_widget_form()
+ */
+function readingtime_field_widget_info() {
+  return array(
+    'field_readingtime_enable' => array(
+      'title' => t('Display reading time.'),
+      'label' => t('Display reading time'),
+      'field types' => array('field_readingtime'),
+      'behaviours' => array(
+        'multiple values' => 'FIELD_BEHAVIOR_DEFAULT',
+        'default value' => 'FIELD_BEHAVIOR_DEFAULT',
+      ),
+    ),
+  );
+}
+
+
+/**
+ * Implements hook_field_widget_form().
+ *
+ * hook_widget_form() is where Drupal tells us to create form elements for
+ * our field's widget.
+ *
+ * We provide one of three different forms, depending on the widget type of
+ * the Form API item provided.
+ */
+function readingtime_field_widget_form(&$form, &$form_state, $field, $instance, $langcode, $items, $delta, $element) {
+  if (isset($instance['default_value'][$delta]['readingtime'])) {
+    $default = $instance['default_value'][$delta]['readingtime'];
+  }
+  else {
+    $default = 0;
+  }
+  $value = isset($items[$delta]['readingtime']) ? $items[$delta]['readingtime'] : $default;
+
+  if (is_null($value)) {
+    $value = 0;
+  }
+
+  $widget = $element;
+
+  $widget['#delta'] = $delta;
+
+  switch ($instance['widget']['type']) {
+
+    case 'field_readingtime_enable':
+
+      $widget = array(
+        '#type' => 'checkbox',
+        '#title' => t('Display time to read'),
+        '#description' => t('Calculates the time to read an article and displays it to the viewer.'),
+        '#default_value' => $value,
+      );
+
+      break;
+  }
+
+  $element['readingtime'] = $widget;
+  return $element;
+}
+
+/**
+ * Calculates the reading time based on supplied content.
+ *
+ * @param string $content 
+ *   The supplied content. 
+ *
+ * @return int
+ *   Returns reading time in minutes.
+ */
+function _calculate_reading_time($content) {
+  $word = str_word_count(strip_tags($content));
+  $minutes = floor($word / (200 / 60) / 60);
+  $seconds = floor($word / (200 / 60)) - ($minutes * 60);
+
+  $est = '';
+
+  if ($minutes > 0) {
+    $est .= $minutes;
+  }
+  if ($seconds > 0 && $seconds < 15) {
+  }
+
+  if ($seconds > 15 && $seconds < 30) {
+    $est .= " &frac14;";
+  }
+
+  if ($seconds > 30 && $seconds < 45) {
+    $est .= " &frac12;";
+  }
+  if ($seconds > 45 && $seconds < 60) {
+    $est .= " &frac34;";
+  }
+
+  if ($est <> '') {
+    return $est;
+  }
+  return 0;
+}
